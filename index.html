@@ -6,10 +6,10 @@
 <meta name="color-scheme" content="light dark">
 <title>VEXORA MARKET | إعلانات المنتجات والخدمات في الجزائر</title>
 <meta name="description" content="منصة إعلانات محلية للمنتجات والخدمات في جميع ولايات الجزائر. تواصل مباشرة مع البائع عبر واتساب.">
-<link rel="canonical" href="https://vexora-market.pages.dev/">
+<link rel="canonical" href="https://faressalhi883-cell.github.io/vexora-market/">
 <meta name="theme-color" content="#0d4a42" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0f1412" media="(prefers-color-scheme: dark)">
-<meta property="og:url" content="https://vexora-market.pages.dev/">
+<meta property="og:url" content="https://faressalhi883-cell.github.io/vexora-market/">
 <meta property="og:title" content="VEXORA MARKET">
 <meta property="og:description" content="إعلانات المنتجات والخدمات في جميع ولايات الجزائر">
 <meta property="og:type" content="website">
@@ -203,7 +203,7 @@ footer{background:var(--surface);border-top:1px solid var(--line);padding:28px 1
         <div class="field"><label for="fWilaya">الولاية</label><select id="fWilaya" name="wilaya"></select><div class="err" id="e-wilaya"></div></div>
         <div class="field"><label for="fPhone">رقم واتساب</label><input id="fPhone" name="phone" type="tel" inputmode="tel" placeholder="0555123456" dir="ltr" style="text-align:right" autocomplete="tel"><div class="err" id="e-phone"></div></div>
       </div>
-      <div class="field" id="mediaField"><label for="fMedia">صورة أو فيديو</label><input id="fMedia" name="media" type="file" accept="image/*,video/mp4,video/webm"><div class="hint">حتى 20 ميغابايت. الصور تُضغط تلقائياً.</div><div class="progress" id="prog"><i></i></div><div class="err" id="e-media"></div></div>
+      <div class="field" id="mediaField"><label for="fMedia">صورة المنتج</label><input id="fMedia" name="media" type="file" accept="image/*"><div class="hint">حتى 10 ميغابايت. الصور تُضغط تلقائياً.</div><div class="progress" id="prog"><i></i></div><div class="err" id="e-media"></div></div>
       <div class="field"><label for="fDesc">الوصف</label><textarea id="fDesc" name="desc" maxlength="600" placeholder="الحالة، المواصفات، الشروط، مكان الاستلام"></textarea><div class="hint"><span id="descCount">0</span> / 600</div><div class="err" id="e-desc"></div></div>
       <button class="btn-gold" id="submitBtn" type="submit" style="width:100%">نشر الإعلان</button>
     </form>
@@ -264,9 +264,8 @@ footer{background:var(--surface);border-top:1px solid var(--line);padding:28px 1
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
-/* تم دمج مفاتيح Firebase الخاصة بك هنا */
+/* مفاتيح Firebase الخاصة بك */
 const firebaseConfig = {
   apiKey: "AIzaSyDdELO4JQ3-Iq05pYdWAG8r85fdSkCGu3g",
   authDomain: "vexora-market-b47d3.firebaseapp.com",
@@ -279,9 +278,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-const storage = getStorage(app);
 
-const SITE_URL = "https://vexora-market.pages.dev";
+/* إعدادات Cloudinary الخاصة بك */
+const CLOUDINARY_CLOUD_NAME = "jlbxufzi";
+const CLOUDINARY_PRESET = "vexora_preset";
+
+const SITE_URL = "https://faressalhi883-cell.github.io/vexora-market/";
 const PAGE_SIZE = 12;
 const MAX_BYTES = 20 * 1024 * 1024;
 const PHONE_RE = /^213[5-7]\d{8}$/;
@@ -289,7 +291,6 @@ const WILAYAS = [["01","أدرار"],["02","الشلف"],["03","الأغواط"]
 const WILAYA_NAMES = WILAYAS.map(w => w[1]);
 const CATS = { farm:"فلاحة وتسمين", electronics:"إلكترونيات", auto:"قطع غيار وسيارات", services:"خدمات رقمية وتصميم" };
 const PLACEHOLDER = "data:image/svg+xml;charset=utf-8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="100%" height="100%" fill="#ece5d4"/><text x="50%" y="50%" font-family="sans-serif" font-size="32" fill="#5b6661" text-anchor="middle" dominant-baseline="middle">لا توجد صورة</text></svg>');
-const VIDEO_PH = "data:image/svg+xml;charset=utf-8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="100%" height="100%" fill="#1a2420"/><circle cx="400" cy="300" r="70" fill="#e0a22a"/><polygon points="376,262 376,338 442,300" fill="#1d1a10"/></svg>');
 
 const $ = id => document.getElementById(id);
 const fmt = n => Number(n || 0).toLocaleString("en-US");
@@ -344,19 +345,16 @@ function filtered() {
   return list.sort(sorters[state.sort] || sorters.new);
 }
 
-function mediaEl(l, { lazy = true, playVideo = false } = {}) {
-  const isVideo = l.media && l.media.type === "video";
+function mediaEl(l, { lazy = true } = {}) {
   const src = safeMediaUrl(l.media?.url);
-  if (isVideo && playVideo && src) return el("video", { controls:true, playsInline:true, preload:"metadata", src });
-  const imgSrc = isVideo ? VIDEO_PH : (src || PLACEHOLDER);
+  const imgSrc = src || PLACEHOLDER;
   const img = el("img", { alt: l.title, loading: lazy ? "lazy" : "eager", decoding: "async", src: imgSrc });
-  img.addEventListener("error", () => { img.src = isVideo ? VIDEO_PH : PLACEHOLDER; }, { once:true });
+  img.addEventListener("error", () => { img.src = PLACEHOLDER; }, { once:true });
   return img;
 }
 
 function card(l) {
   const wrap = el("div", { className:"media-wrap" }, mediaEl(l));
-  if (l.media?.type === "video") wrap.append(el("span", { className:"pill", textContent:"فيديو" }));
   const view = el("button", { className:"btn-soft", type:"button", textContent:"التفاصيل" });
   view.addEventListener("click", () => openDetail(l, view));
   const wa = el("a", { className:"btn-wa", href: waLink(l.phone, `مرحباً، أنا مهتم بإعلانك: ${l.title}`), target:"_blank", rel:"noopener noreferrer", textContent:"واتساب" });
@@ -394,7 +392,7 @@ function openDetail(l, trigger) {
   detailOpenId = l.id;
   const body = $("detailBody");
   body.replaceChildren();
-  const media = mediaEl(l, { lazy:false, playVideo:true });
+  const media = mediaEl(l, { lazy:false });
   media.classList.add("dlg-media");
   const close = el("button", { className:"close", type:"button", textContent:"×", "aria-label":"إغلاق" });
   close.addEventListener("click", () => $("detailDlg").close());
@@ -481,17 +479,26 @@ async function publish(data, file) {
     try {
       const toUpload = await compressImage(file);
       bar.style.width = "50%";
-      const path = `listings/${currentUser.uid}/${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
-      const fileRef = sRef(storage, path);
-      await uploadBytes(fileRef, toUpload);
-      bar.style.width = "85%";
-      const url = await getDownloadURL(fileRef);
+      
+      const formData = new FormData();
+      formData.append("file", toUpload);
+      formData.append("upload_preset", CLOUDINARY_PRESET);
+
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+        method: "POST",
+        body: formData
+      });
+      
+      if (!res.ok) throw new Error("upload-failed");
+      const result = await res.json();
+      
       bar.style.width = "100%";
-      media = { id: path, url, type: file.type.startsWith("video") ? "video" : "image" };
+      media = { id: result.public_id, url: result.secure_url, type: "image" };
     } finally {
       setTimeout(() => { prog.style.display = "none"; bar.style.width = "0"; }, 600);
     }
   }
+  
   await addDoc(collection(db, "listings"), {
     ...data, media,
     sellerId: currentUser.uid,
@@ -571,7 +578,7 @@ function validate(d, file) {
   if (!WILAYA_NAMES.includes(d.wilaya)) e.wilaya = "اختر الولاية";
   if (!PHONE_RE.test(d.phone)) e.phone = "رقم غير صحيح، مثال: 0555123456";
   if (file && file.size > MAX_BYTES) e.media = "الملف أكبر من 20 ميغابايت";
-  if (file && !/^(image\/|video\/(mp4|webm))/.test(file.type)) e.media = "الصيغ المسموحة: صورة أو فيديو MP4 أو WebM";
+  if (file && !file.type.startsWith("image/")) e.media = "يُسمح بالصور فقط";
   if (d.desc.length < 10) e.desc = "الوصف قصير جداً (10 أحرف على الأقل)";
   return e;
 }
